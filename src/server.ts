@@ -1,10 +1,12 @@
 import app from "./app.js";
-import { initPrisma } from "./utils/prisma-client.js";
+// import { initPrisma } from "./utils/prisma-client.js";
+import { connectRabbitMQ } from "./services/rabbitmq.js";
 
 const PORT = process.env.PORT || 8000;
 
 async function start() {
-  await initPrisma();
+  await connectRabbitMQ();
+  // await initPrisma();
   app.listen(PORT, () => {
     console.log(`🚀 Server listening at http://localhost:${PORT}`);
   });

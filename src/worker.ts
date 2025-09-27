@@ -5,21 +5,23 @@ import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { setJobStatus } from "./models/job.js";
+import logger from "./utils/logger.js";
 
 import { downloadFromS3, uploadBufferToS3 } from "./services/s3.js";
 import { JobStatus } from "@prisma/client";
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || "amqp://localhost";
 const RENDER_QUEUE = "render_jobs";
-const TEMP_DIR = path.join(process.cwd(), "temp"); // Local temp directory
+const TEMP_DIR = path.join(process.cwd(), "temp");
 
-// Ensure the temporary directory exists upon worker startup
 const ensureTempDir = async () => {
   try {
     await fs.mkdir(TEMP_DIR, { recursive: true });
-    console.log(`Temp directory created at: ${TEMP_DIR}`);
+    logger.info(`Temp directory created at: ${TEMP_DIR}`, "WORKER");
   } catch (error) {
-    console.error("Failed to create temp directory:", error);
+    logger.error("Failed to create temp directory", "WORKER", error, {
+      tempDir: TEMP_DIR,
+    });
     // Worker should not proceed without temp storage
     throw error;
   }
@@ -33,28 +35,36 @@ const executeFfmpegRender = (
   return new Promise((resolve, reject) => {
     try {
       // Example FFmpeg command: compress the video
-      const command = `ffmpeg -i ${localInputPath} -y -vcodec libx264 -crf 28 ${localOutputPath}`;
+      const fontPath = process.env.FFMPEG_FONT_PATH;
+      logger.info(`Font path: ${fontPath}`, "WORKER");
 
-      //   command = ffmpeg -analyzeduration 2147483647 -probesize 2147483647 -i [INPUT_PATH] -y -vcodec libx264 -crf 28 [OUTPUT_PATH]
+      const drawtextFilter = `drawtext=text='rohit-copy':x=w-tw-10:y=h-th-10:fontsize=30:fontcolor=black@0.7:fontfile=${fontPath}`;
+      const command = `ffmpeg -i ${localInputPath} -vf "${drawtextFilter}" -y -vcodec libx264 -crf 28 ${localOutputPath}`;
 
-      console.log(`🎬 [${jobId}] Starting FFmpeg: ${command}`);
+      logger.info(`Starting FFmpeg processing`, "WORKER", { jobId, command });
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          console.error(`❌ [${jobId}] FFmpeg error:`, stderr);
+          logger.error(`FFmpeg processing failed`, "WORKER", error, {
+            jobId,
+            stderr,
+          });
           return reject(new Error(stderr));
         }
-        console.log(`✅ [${jobId}] FFmpeg finished successfully.`);
+        logger.info(`FFmpeg processing completed successfully`, "WORKER", {
+          jobId,
+        });
         resolve();
       });
     } catch (error) {
-      console.error("errors", error);
+      logger.error("FFmpeg execution error", "WORKER", error, { jobId });
+      reject(error);
     }
   });
 };
 
 const startWorker = async () => {
-  console.log("Worker is starting...");
-  await ensureTempDir(); // Ensure temp storage exists
+  logger.info("Worker is starting...", "WORKER");
+  await ensureTempDir();
 
   try {
     const connection = await amqp.connect(RABBITMQ_URL);
@@ -62,28 +72,27 @@ const startWorker = async () => {
     await channel.assertQueue(RENDER_QUEUE, { durable: true });
     channel.prefetch(1);
 
-    console.log("... waiting for jobs in queue:", RENDER_QUEUE);
+    logger.info("Worker connected to RabbitMQ, waiting for jobs", "WORKER", {
+      queue: RENDER_QUEUE,
+    });
 
     channel.consume(
       RENDER_QUEUE,
       async (msg) => {
         if (msg === null) return;
 
-        // Use a flag to track if we need to clean up local files
         let localInputPath: string | null = null;
         let localOutputPath: string | null = null;
 
         const { jobId, assetPath } = JSON.parse(msg.content.toString());
-        console.log(`\nRECEIVED job: ${jobId}`);
+        logger.info(`Received render job`, "WORKER", { jobId, assetPath });
 
         try {
-          // 1. Update status to PROCESSING
           await setJobStatus(jobId, {
             status: JobStatus.PROCESSING,
             attempts: { increment: 1 },
           });
 
-          // --- S3 DOWNLOAD AND LOCAL PREP ---
           const fileExtension = path.extname(assetPath);
           const baseName = path.basename(assetPath, fileExtension);
 
@@ -94,20 +103,29 @@ const startWorker = async () => {
           localOutputPath = path.join(
             TEMP_DIR,
             `${baseName}_${uuidv4()}_output.mp4`
-          ); // FFmpeg output format
+          );
 
-          console.log(`[${jobId}] Downloading asset from S3: ${assetPath}`);
+          logger.info(`Downloading asset from S3`, "WORKER", {
+            jobId,
+            assetPath,
+          });
           const inputBuffer = await downloadFromS3(assetPath);
           await fs.writeFile(localInputPath, inputBuffer);
-          console.log(`[${jobId}] Asset saved locally: ${localInputPath}`); // 2. Execute the render job using local paths
+          logger.info(`Asset saved locally`, "WORKER", {
+            jobId,
+            localInputPath,
+          });
 
           await executeFfmpegRender(localInputPath, localOutputPath, jobId);
 
           // --- S3 UPLOAD AND DB UPDATE ---
           const outputBuffer = await fs.readFile(localOutputPath);
-          const outputS3Key = `projects/rendered/${jobId}_compressed_output.mp4`; // New S3 key for the rendered output
+          const outputS3Key = `projects/rendered/${jobId}_compressed_output.mp4`;
 
-          console.log(`[${jobId}] Uploading result to S3: ${outputS3Key}`);
+          logger.info(`Uploading result to S3`, "WORKER", {
+            jobId,
+            outputS3Key,
+          });
           const { s3Url: outputUrl } = await uploadBufferToS3(
             outputBuffer,
             outputS3Key,
@@ -119,44 +137,51 @@ const startWorker = async () => {
             outputUrl: outputUrl,
           });
 
-          console.log(`✅ Job ${jobId} finished. Output URL: ${outputUrl}`);
+          logger.info(`Job completed successfully`, "WORKER", {
+            jobId,
+            outputUrl,
+          });
         } catch (error: any) {
           await setJobStatus(
             jobId,
             { status: JobStatus.FAILED },
             error.message
           );
-          console.error(`❌ Job ${jobId} failed. Error:`, error);
+          logger.error(`Job failed`, "WORKER", error, { jobId });
         } finally {
           // --- CLEANUP ---
           if (localInputPath) {
-            await fs
-              .unlink(localInputPath)
-              .catch((err) =>
-                console.warn(
-                  `Could not delete input temp file ${localInputPath}: ${err.message}`
-                )
-              );
+            await fs.unlink(localInputPath).catch((err) =>
+              logger.warn(`Could not delete input temp file`, "WORKER", {
+                jobId,
+                localInputPath,
+                error: err.message,
+              })
+            );
           }
           if (localOutputPath) {
-            await fs
-              .unlink(localOutputPath)
-              .catch((err) =>
-                console.warn(
-                  `Could not delete output temp file ${localOutputPath}: ${err.message}`
-                )
-              );
+            await fs.unlink(localOutputPath).catch((err) =>
+              logger.warn(`Could not delete output temp file`, "WORKER", {
+                jobId,
+                localOutputPath,
+                error: err.message,
+              })
+            );
           }
-          console.log(`[${jobId}] Local files cleaned up.`); // 5. Acknowledge the message was processed
+          logger.info(`Local files cleaned up`, "WORKER", { jobId });
 
           channel.ack(msg);
-          console.log(`[${jobId}] Message Acknowledged.`);
+          logger.info(`Message acknowledged`, "WORKER", { jobId });
         }
       },
       { noAck: false }
     );
   } catch (error) {
-    console.error("Worker failed to start or connect to RabbitMQ", error);
+    logger.error(
+      "Worker failed to start or connect to RabbitMQ",
+      "WORKER",
+      error
+    );
     setTimeout(startWorker, 5000);
   }
 };

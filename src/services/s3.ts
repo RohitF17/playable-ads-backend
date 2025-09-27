@@ -9,6 +9,7 @@ import {
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
+import logger from "../utils/logger.js";
 
 // Configure AWS SDK v3
 const s3Client = new S3Client({
@@ -33,9 +34,14 @@ export async function uploadToS3(
 ): Promise<S3UploadResult> {
   try {
     if (!file.path) {
-      throw new Error(
+      const error = new Error(
         `Upload aborted: File '${file.originalname}' is missing path.`
       );
+      logger.error("File upload failed - missing path", "S3", error, {
+        filename: file.originalname,
+        projectId,
+      });
+      throw error;
     }
 
     const fileExtension = path.extname(file.originalname);
@@ -65,13 +71,23 @@ export async function uploadToS3(
       process.env.AWS_REGION || "us-east-1"
     }.amazonaws.com/${s3Key}`;
 
+    logger.info("File uploaded to S3 successfully", "S3", {
+      s3Key,
+      projectId,
+      filename: file.originalname,
+      size: file.size,
+    });
+
     return {
       s3Path: s3Key,
       s3Url: s3Url,
       key: s3Key,
     };
   } catch (error) {
-    console.error("Error uploading to S3:", error);
+    logger.error("Error uploading to S3", "S3", error, {
+      projectId,
+      filename: file.originalname,
+    });
     throw new Error(
       `Failed to upload file to S3: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -100,12 +116,21 @@ export async function downloadFromS3(s3Key: string): Promise<Buffer> {
 
     if (response.Body) {
       // Use the helper to convert the ReadableStream to a Buffer
-      return streamToBuffer(response.Body);
+      const buffer = await streamToBuffer(response.Body);
+      logger.info("File downloaded from S3 successfully", "S3", {
+        s3Key,
+        size: buffer.length,
+      });
+      return buffer;
     }
 
-    throw new Error("S3 GetObject response body was null.");
+    const error = new Error("S3 GetObject response body was null.");
+    logger.error("S3 download failed - null response body", "S3", error, {
+      s3Key,
+    });
+    throw error;
   } catch (error) {
-    console.error("Error downloading from S3:", error);
+    logger.error("Error downloading from S3", "S3", error, { s3Key });
     throw new Error(
       `Failed to download file from S3: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -135,12 +160,21 @@ export async function uploadBufferToS3(
       process.env.AWS_REGION || "us-east-1"
     }.amazonaws.com/${s3Key}`;
 
+    logger.info("Buffer uploaded to S3 successfully", "S3", {
+      s3Key,
+      contentType,
+      size: fileBuffer.length,
+    });
+
     return {
       s3Path: s3Key,
       s3Url: s3Url,
     };
   } catch (error) {
-    console.error("Error uploading buffer to S3:", error);
+    logger.error("Error uploading buffer to S3", "S3", error, {
+      s3Key,
+      contentType,
+    });
     throw new Error(
       `Failed to upload buffer to S3: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -148,47 +182,3 @@ export async function uploadBufferToS3(
     );
   }
 }
-
-// /**
-//  * Delete a file from Amazon S3
-//  * @param s3Key - The S3 key (path) of the file to delete
-//  * @returns Promise with deletion result
-//  */
-// export async function deleteFromS3(s3Key: string): Promise<boolean> {
-//   try {
-//     const deleteParams = {
-//       Bucket: BUCKET_NAME,
-//       Key: s3Key,
-//     };
-
-//     const command = new DeleteObjectCommand(deleteParams);
-//     await s3Client.send(command);
-//     return true;
-//   } catch (error) {
-//     console.error("Error deleting from S3:", error);
-//     throw new Error(`Failed to delete file from S3: ${error.message}`);
-//   }
-// }
-
-// /**
-//  * Get a signed URL for private file access (if needed)
-//  * @param s3Key - The S3 key (path) of the file
-//  * @param expiresIn - URL expiration time in seconds (default: 1 hour)
-//  * @returns Promise with signed URL
-//  */
-// export async function getSignedUrl(
-//   s3Key: string,
-//   expiresIn: number = 3600
-// ): Promise<string> {
-//   try {
-//     const command = new GetObjectCommand({
-//       Bucket: BUCKET_NAME,
-//       Key: s3Key,
-//     });
-
-//     return await getSignedUrl(s3Client, command, { expiresIn });
-//   } catch (error) {
-//     console.error("Error generating signed URL:", error);
-//     throw new Error(`Failed to generate signed URL: ${error.message}`);
-//   }
-// }

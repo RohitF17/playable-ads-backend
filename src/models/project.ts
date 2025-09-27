@@ -1,4 +1,5 @@
 import prisma from "../utils/prisma-client.js";
+import logger from "../utils/logger.js";
 
 export async function postProject(
   title: string,
@@ -9,8 +10,17 @@ export async function postProject(
     const project = await prisma.project.create({
       data: { title, description, userId },
     });
+    logger.info("Project created successfully", "DATABASE", {
+      projectId: project.id,
+      userId,
+      title,
+    });
     return project;
   } catch (error) {
-    console.error("error", error);
+    logger.error("Error creating project", "DATABASE", error, {
+      userId,
+      title,
+    });
+    throw error;
   }
 }

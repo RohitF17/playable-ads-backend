@@ -20,6 +20,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+RUN mkdir -p /app/temp && chmod 777 /app/temp
 # Generate Prisma client
 RUN npx prisma generate
 # RUN npx prisma migrate deploy

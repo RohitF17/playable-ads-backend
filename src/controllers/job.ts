@@ -11,6 +11,7 @@ export const getJobStatus = async (req: Request, res: Response) => {
       logger.warn("Missing job ID in request", "JOB", { params: req.params });
       return res.status(400).json({ message: "Job ID is required" });
     }
+    logger.info("job details",id)
 
     const job = await getJob(id);
 

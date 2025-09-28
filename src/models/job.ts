@@ -66,11 +66,9 @@ export async function setJobStatus(
     status: data.status,
     outputUrl: data.outputUrl,
     attempts: data.attempts,
-    // Start with error set to null/undefined, will be overwritten if failing
     error: undefined,
   };
 
-  // 2. Conditionally include the error message
   if (data.status === "FAILED" && error && error.message) {
     updateData.error = String(error.message);
   }

@@ -18,7 +18,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
 app.use("/projects", projectRouter);
-app.use("/job", jobRouter);
+app.use("/jobs", jobRouter);
 app.use("/analytics", analyticsRouter);
 
 app.get("/", (req: Request, res: Response) => {

@@ -12,7 +12,7 @@ import { JobStatus } from "@prisma/client";
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || "amqp://localhost";
 const RENDER_QUEUE = "render_jobs";
-const TEMP_DIR = path.join(process.cwd(), "temp");
+const TEMP_DIR = '/app/temp';
 
 const ensureTempDir = async () => {
   try {

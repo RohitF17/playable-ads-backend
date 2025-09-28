@@ -5,7 +5,11 @@ import { fileURLToPath } from "url";
 // Recreate __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const options: swaggerJsdoc.Options = {
+
+// Detect if running from TS or compiled JS
+const isTs = __filename.endsWith(".ts");
+
+const swaggerOptions: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
@@ -16,7 +20,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: "http://localhost:8000",
+        url: "/",
         description: "Development server",
       },
     ],
@@ -37,9 +41,12 @@ const options: swaggerJsdoc.Options = {
       },
     ],
   },
-  apis: [path.resolve(__dirname, "./routes/*.ts")], // ✅ absolute path
+  apis: [
+    // If running TS (dev), point to src/*.ts, else point to dist/*.js
+    path.join(__dirname, isTs ? "./routes/*.ts" : "./routes/*.js"),
+  ],
 };
 
-const swaggerSpec = swaggerJsdoc(options);
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-export default swaggerSpec; // ✅ only export default (no module.exports)
+export default swaggerSpec;

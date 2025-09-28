@@ -78,7 +78,7 @@ export const uploadAsset = async (req: Request, res: Response) => {
       type: file.mimetype.startsWith("video")
         ? AssetType.VIDEO
         : AssetType.IMAGE,
-      s3Path: s3Result.s3Url, // Store the S3 key/path
+      s3Path: s3Result.s3Path, // Store the S3 key/path
     };
 
     const asset = await createAsset(data);
@@ -87,7 +87,7 @@ export const uploadAsset = async (req: Request, res: Response) => {
       projectId,
       filename: file.originalname,
       size: file.size,
-      s3Path: s3Result.s3Url,
+      s3Path: s3Result.s3Path,
     });
 
     // Return asset data with S3 URL

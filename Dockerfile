@@ -1,12 +1,12 @@
 # Use Node.js 18 Alpine for smaller image size
-FROM node:18-alpine
-
+FROM node:18-slim
 # Install FFmpeg and other dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     ffmpeg \
     fontconfig \
-    ttf-dejavu \
-    && rm -rf /var/cache/apk/*
+    fonts-dejavu \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -15,14 +15,14 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
-
+# RUN npx prisma migrate deploy
 # Build the application
 RUN npm run build
 

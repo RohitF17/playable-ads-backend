@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: playable_user
       POSTGRES_PASSWORD: playable_password
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
@@ -28,8 +28,8 @@ services:
       RABBITMQ_DEFAULT_USER: playable_user
       RABBITMQ_DEFAULT_PASS: playable_password
     ports:
-      - "5672:5672" # AMQP port
-      - "15672:15672" # Management UI port
+      - "5673:5672" # AMQP port
+      - "15673:15672" # Management UI port
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -42,24 +42,26 @@ services:
   app:
     build: .
     container_name: playable-ads-app
+    command: >
+      sh -c "npx prisma migrate deploy && npm start"
     environment:
       # Database
       DATABASE_URL: postgresql://playable_user:playable_password@postgres:5432/playable_ads_db
 
       # JWT
-      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      JWT_SECRET: ${JWT_SECRET}
 
       # AWS S3 (you'll need to set these)
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_REGION: ${AWS_REGION}
       AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
 
       # RabbitMQ
       RABBITMQ_URL: amqp://playable_user:playable_password@rabbitmq:5672
 
       # Server
-      PORT: 8000
+      PORT: 8080
 
       # Logging
       LOG_LEVEL: INFO
@@ -69,7 +71,7 @@ services:
       # FFmpeg
       FFMPEG_FONT_PATH: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
     ports:
-      - "8000:8000"
+      - "8080:8080"
     volumes:
       - ./logs:/app/logs
       - ./temp:/app/temp
@@ -90,12 +92,12 @@ services:
       DATABASE_URL: postgresql://playable_user:playable_password@postgres:5432/playable_ads_db
 
       # JWT
-      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      JWT_SECRET: ${JWT_SECRET}
 
       # AWS S3
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_REGION: ${AWS_REGION}
       AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
 
       # RabbitMQ

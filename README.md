@@ -385,35 +385,8 @@ docker-compose logs worker
 # Go to http://localhost:15672 and check the "render_jobs" queue
 ```
 
-### Performance Tuning
 
-#### Database
 
-- Increase `shared_buffers` in PostgreSQL
-- Add database indexes for frequently queried fields
-
-#### Worker
-
-- Scale worker instances: `docker-compose up --scale worker=3`
-- Adjust `channel.prefetch(1)` in worker.ts for concurrent processing
-
-#### S3
-
-- Use S3 Transfer Acceleration for faster uploads
-- Implement S3 lifecycle policies for cost optimization
-
-## 🔒 Security Considerations
-
-### Production Checklist
-
-- [ ] Change default JWT secret
-- [ ] Use strong database passwords
-- [ ] Enable SSL/TLS for database connections
-- [ ] Configure proper S3 bucket policies
-- [ ] Set up proper logging and monitoring
-- [ ] Use secrets management (AWS Secrets Manager, etc.)
-- [ ] Enable database encryption at rest
-- [ ] Configure firewall rules
 
 ### Environment Variables Security
 
@@ -423,46 +396,5 @@ Never commit `.env` files to version control. Use:
 - Environment-specific files (`.env.production`, `.env.staging`)
 - Secrets management services in production
 
-## 📈 Scaling
 
-### Horizontal Scaling
 
-Scale worker instances:
-
-```bash
-docker-compose up --scale worker=5
-```
-
-### Load Balancing
-
-Use a reverse proxy (nginx, Traefik) to distribute API requests across multiple app instances.
-
-### Database Scaling
-
-- Read replicas for read-heavy workloads
-- Connection pooling (PgBouncer)
-- Database sharding for very large datasets
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-If you encounter issues:
-
-1. Check the troubleshooting section above
-2. Review application logs
-3. Check Docker container status: `docker-compose ps`
-4. Verify all environment variables are set correctly
-5. Ensure all external services (S3, database) are accessible
-
-For additional help, please open an issue in the repository.

@@ -67,7 +67,7 @@ docker-compose exec app npx prisma migrate deploy
 Check the health endpoint:
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 ```
 
 You should see:
@@ -287,7 +287,7 @@ Logs are stored in the `./logs` directory:
 
 Access the RabbitMQ management UI at:
 
-- URL: http://localhost:15672
+- URL: http://localhost:15673
 - Username: `playable_user`
 - Password: `playable_password`
 
@@ -295,8 +295,8 @@ Access the RabbitMQ management UI at:
 
 Once running, visit:
 
-- **API Docs**: http://localhost:8000/api-docs
-- **Health Check**: http://localhost:8000/health
+- **API Docs**: http://localhost:8080/api-docs
+- **Health Check**: http://localhost:8080/health
 
 ### Key Endpoints
 
